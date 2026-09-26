@@ -1,0 +1,56 @@
+<Solution>
+  <Folder Name="/src/" />
+  <Folder Name="/src/api/">
+    <Project Path="src/api/StarterApp.Api/StarterApp.Api.csproj" />
+    <Project Path="src/api/StarterApp.Application/StarterApp.Application.csproj" />
+    <Project Path="src/api/StarterApp.Domain/StarterApp.Domain.csproj" />
+    <Project Path="src/api/StarterApp.Infrastructure/StarterApp.Infrastructure.csproj" />
+    <!--#if (includeTests) -->
+    <Project Path="src/api/StarterApp.IntegrationTests/StarterApp.IntegrationTests.csproj" />
+    <Project Path="src/api/StarterApp.UnitTests/StarterApp.UnitTests.csproj" />
+    <!--#endif -->
+    <!--#if (useDocker) -->
+    <File Path="src/api/.dockerignore" />
+    <File Path="src/api/docker-compose.yml" />
+    <File Path="src/api/docker-compose.override.yml" />
+    <!--#endif -->
+  </Folder>
+  <!--#if (includeUi) -->
+  <Folder Name="/src/ui/">
+    <File Path="src/ui/.gitignore" />
+    <File Path="src/ui/index.html" />
+    <File Path="src/ui/package.json" />
+    <File Path="src/ui/playwright.config.ts" />
+    <File Path="src/ui/tsconfig.json" />
+    <File Path="src/ui/vite.config.ts" />
+  </Folder>
+  <!--#endif -->
+  <!--#if (includeUi || includeInfra) -->
+  <Folder Name="/.github/">
+    <!--#if (includeInfra) -->
+    <File Path=".github/workflows/api_build_and_deploy.yml" />
+    <!--#endif -->
+    <!--#if (includeUi) -->
+    <File Path=".github/workflows/e2e.yml" />
+    <!--#endif -->
+    <!--#if (includeInfra) -->
+    <File Path=".github/workflows/ui_build_and_deploy.yml" />
+    <!--#endif -->
+  </Folder>
+  <!--#endif -->
+  <!--#if (includeInfra) -->
+  <Folder Name="/terraform/" />
+  <Folder Name="/terraform/dev/">
+    <File Path="terraform/dev/api.tf" />
+    <File Path="terraform/dev/ui.tf" />
+    <File Path="terraform/dev/variables.tf" />
+    <File Path="terraform/dev/terraform.tfvars.example" />
+  </Folder>
+  <Folder Name="/terraform/prod/">
+    <File Path="terraform/prod/api.tf" />
+    <File Path="terraform/prod/ui.tf" />
+    <File Path="terraform/prod/variables.tf" />
+    <File Path="terraform/prod/terraform.tfvars.example" />
+  </Folder>
+  <!--#endif -->
+</Solution>

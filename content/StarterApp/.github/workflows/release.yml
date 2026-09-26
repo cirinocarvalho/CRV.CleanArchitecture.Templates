@@ -1,0 +1,183 @@
+name: Release
+
+# Every push to the production branch is a release. This workflow:
+#
+# 1. Computes the next version (.github/scripts/Get-NextVersion.ps1): the latest vX.Y.Z
+#    tag bumped by the conventional-commit subjects since it. feat: = minor, a "!" or a
+#    BREAKING CHANGE footer = major, anything else = patch. See README.md#releasing.
+#if (includeUi)
+# 2. Builds and deploys the API and the UI to production through their own workflows,
+#    passing that version so it is stamped into both: the API's assembly version and the
+#    immutable ECR image tag, and VITE_APP_VERSION in the UI bundle. The UI deploy runs
+#    the Playwright + WCAG 2.2 AA suite first, so a failing suite blocks the release.
+# 3. Only once both deploys succeed, pushes the vX.Y.Z tag and publishes a GitHub Release
+#    with generated notes and the accessibility report attached. Tagging last means a
+#    failed deploy leaves no tag behind, and the next attempt computes the same version.
+#endif
+#if (!includeUi)
+# 2. Builds and deploys the API to production through api_build_and_deploy.yml, passing
+#    that version so it is stamped into the assembly and onto the immutable ECR image tag.
+# 3. Only once the deploy succeeds, pushes the vX.Y.Z tag and publishes a GitHub Release
+#    with generated notes. Tagging last means a failed deploy leaves no tag behind, and
+#    the next attempt computes the same version.
+#endif
+#
+# Run it from the Actions tab to override the bump (e.g. major for a 2.0), or to redeploy
+# the current release: with no commits since the last tag nothing is tagged, and the
+# deploys rerun at the version they already carry.
+#
+# Pushes to main deploy to the dev environment through those same workflows, stamped with
+# the pre-release version they would become (e.g. 1.4.0-dev.a1b2c3d); no tag is cut.
+
+# Automatic releases are OFF for now: run this from the Actions tab (on the production
+# branch) to release. To release on every push to production again, uncomment the
+# 'push:' block below.
+on:
+  # push:
+  #   branches: [production]
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: Version bump
+        required: false
+        default: auto
+        options: [auto, patch, minor, major]
+        type: choice
+
+# A called workflow can only hold permissions the caller grants, and the deploys below
+# exchange the OIDC token for their AWS role.
+permissions:
+  contents: read
+  id-token: write
+
+# One release at a time, never cancelled: a half-finished run could leave a deploy without
+# its tag, or a tag without its deploy.
+concurrency:
+  group: release-production
+  cancel-in-progress: false
+
+jobs:
+  # ------------------------------------------------------------------------------
+  version:
+    name: Next version
+    if: "!contains(github.event.head_commit.message, 'skip ci')"
+    runs-on: ubuntu-latest
+    outputs:
+      release: ${{ steps.next.outputs.release }}
+      version: ${{ steps.next.outputs.version }}
+      tag: ${{ steps.next.outputs.tag }}
+      previous_tag: ${{ steps.next.outputs.previous_tag }}
+      bump: ${{ steps.next.outputs.bump }}
+    steps:
+      # A manual run from any other branch would tag and deploy that branch as a release.
+      - name: Require the production branch
+        if: github.ref != 'refs/heads/production'
+        run: |
+          echo "::error::Releases are cut from the production branch only; this run is on ${{ github.ref }}."
+          exit 1
+
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # tags and full history are what the version is derived from
+
+      - name: Compute
+        id: next
+        shell: pwsh
+        run: ./.github/scripts/Get-NextVersion.ps1 -Bump '${{ github.event.inputs.bump || 'auto' }}'
+
+      - name: Summarise
+        env:
+          RELEASE: ${{ steps.next.outputs.release }}
+          VERSION: ${{ steps.next.outputs.version }}
+          PREVIOUS_TAG: ${{ steps.next.outputs.previous_tag }}
+          BUMP: ${{ steps.next.outputs.bump }}
+        run: |
+          {
+            echo "### Release"
+            echo ""
+            if [ "$RELEASE" = "true" ]; then
+              echo "Deploying and tagging **v$VERSION** ($BUMP bump from \`${PREVIOUS_TAG:-no previous release}\`)."
+            else
+              echo "No commits since **$PREVIOUS_TAG**; redeploying it. Nothing new is tagged."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # ------------------------------------------------------------------------------
+  deploy-api:
+    name: API
+    needs: [version]
+    uses: ./.github/workflows/api_build_and_deploy.yml
+    with:
+      version: ${{ needs.version.outputs.version }}
+    secrets: inherit
+
+#if (includeUi)
+  deploy-ui:
+    name: UI
+    needs: [version]
+    uses: ./.github/workflows/ui_build_and_deploy.yml
+    with:
+      version: ${{ needs.version.outputs.version }}
+    secrets: inherit
+#endif
+
+  # ------------------------------------------------------------------------------
+  release:
+    name: Release ${{ needs.version.outputs.tag }}
+    needs:
+      - version
+      - deploy-api
+#if (includeUi)
+      - deploy-ui
+#endif
+    if: needs.version.outputs.release == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # tag + release
+    steps:
+      - uses: actions/checkout@v4
+
+#if (includeUi)
+      # Uploaded by e2e.yml inside the UI deploy. Artifacts are shared across the whole
+      # run, nested workflows included. Not fatal if missing: the suite already passed,
+      # or the UI deploy would not have.
+      - name: Download accessibility report
+        id: report
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: playwright-report
+          path: report
+#endif
+
+      - name: Tag
+        env:
+          TAG: ${{ needs.version.outputs.tag }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" -m "$TAG"
+          git push origin "$TAG"
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.version.outputs.tag }}
+          PREVIOUS_TAG: ${{ needs.version.outputs.previous_tag }}
+          HAVE_REPORT: ${{ steps.report.outcome == 'success' }}
+        run: |
+          notes_args=(--generate-notes)
+          if [ -n "$PREVIOUS_TAG" ]; then
+            notes_args+=(--notes-start-tag "$PREVIOUS_TAG")
+          fi
+          assets=()
+          if [ "$HAVE_REPORT" = "true" ] && [ -d report ]; then
+            asset="playwright-report-$TAG.zip"
+            (cd report && zip -qr "../$asset" .)
+            assets+=("$asset")
+            # gh appends the generated notes after --notes.
+            notes_args+=(--notes "**Playwright e2e + WCAG 2.2 AA accessibility report** for this release is attached as \`$asset\` (unzip and open \`playwright-report/index.html\`).")
+          fi
+          gh release create "$TAG" "${assets[@]}" \
+            --title "$TAG" \
+            "${notes_args[@]}"

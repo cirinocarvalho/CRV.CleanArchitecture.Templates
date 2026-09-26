@@ -1,0 +1,46 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <PackageType>Template</PackageType>
+    <PackageId>CRV.CleanArchitecture.Templates</PackageId>
+    <Title>Clean Architecture API + Vue SPA templates</Title>
+    <!--
+      Local-pack fallback only. Released versions come from git tags: the release
+      workflow computes the next vMAJOR.MINOR.PATCH from the commits since the last tag
+      and passes it as -p:Version. This value seeds the very first release and is not
+      bumped afterwards - see docs/authoring.md#releasing.
+    -->
+    <Version>1.0.0</Version>
+    <Authors>Cirino Carvalho</Authors>
+    <Description>
+      A .NET 10 Clean Architecture Web API (JWT auth, API versioning, Swagger, Serilog, EF Core)
+      with an optional Vue 3 + TypeScript + Vite single-page front end.
+    </Description>
+    <PackageTags>dotnet-new;templates;clean-architecture;webapi;vue;spa</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+
+    <TargetFramework>net10.0</TargetFramework>
+    <IncludeContentInPack>true</IncludeContentInPack>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <NoWarn>$(NoWarn);NU5128</NoWarn>
+    <NoDefaultExcludes>true</NoDefaultExcludes>
+    <EnableDefaultItems>false</EnableDefaultItems>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!--
+      Ship the template content verbatim. Build artefacts and dependency folders are
+      excluded so they can never leak into the package.
+    -->
+    <!--
+      PackagePath is set explicitly so the files land at content/StarterApp/... rather
+      than content/content/StarterApp/..., which is what ContentTargetFolders produces
+      when the source directory is itself named "content".
+    -->
+    <Content Include="content\**\*"
+             Exclude="content\**\bin\**;content\**\obj\**;content\**\node_modules\**;content\**\dist\**"
+             PackagePath="content\%(RecursiveDir)%(Filename)%(Extension)" />
+    <Compile Remove="**\*" />
+  </ItemGroup>
+
+</Project>

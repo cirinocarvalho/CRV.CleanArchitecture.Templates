@@ -1,0 +1,17 @@
+# Copy to terraform.tfvars and fill in, or set the same names as Terraform Cloud workspace
+# variables. terraform.tfvars is gitignored — it identifies your AWS account.
+
+vpc_id       = "vpc-00000000000000000"
+ecr_registry = "000000000000.dkr.ecr.us-east-1.amazonaws.com"
+
+# Must live in us-east-1: CloudFront only accepts certificates from that region.
+certificate_arn = "arn:aws:acm:us-east-1:000000000000:certificate/00000000-0000-0000-0000-000000000000"
+
+dns_zone_id_api = "Z000000000000000000000"
+dns_zone_id_ui  = "Z000000000000000000000"
+
+ui_domain_name = "starterapp.example.com"
+ui_aliases     = ["starterapp.example.com"]
+
+# Public by default. Narrow to your organisation's ranges for anything that should not be internet-facing.
+# inbound_cidr_blocks = ["203.0.113.0/24"]

@@ -1,0 +1,366 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Cirino Carvalho",
+  "classifications": [ "Web", "WebAPI", "Solution", "Clean Architecture", "Vue", "SPA" ],
+  "identity": "CRV.CleanArchitecture.VueSpa.CSharp",
+  "groupIdentity": "CRV.CleanArchitecture.VueSpa",
+  "name": "Clean Architecture API + Vue SPA",
+  "description": "A .NET 10 Clean Architecture Web API (JWT auth, API versioning, Swagger, Serilog, EF Core) with an optional Vue 3 + TypeScript + Vite single-page front end.",
+  "shortName": "crv-cleanarch",
+  "sourceName": "StarterApp",
+  "defaultName": "MyApp",
+  "preferNameDirectory": true,
+  "tags": {
+    "language": "C#",
+    "type": "solution",
+    "editorTreatAs": "solution"
+  },
+  "symbols": {
+    "authMode": {
+      "comment": "Deliberately not named 'auth'. Visual Studio treats 'auth' as its own reserved 'Authentication type' parameter — the one Microsoft's web templates use — and binds the dialog to its built-in picker, whose choices are not ours, so the dropdown offers only 'None'. The CLI flag stays --auth via dotnetcli.host.json.",
+      "type": "parameter",
+      "datatype": "choice",
+      "defaultValue": "jwt",
+      "displayName": "Authentication",
+      "description": "Authentication to scaffold into the solution.",
+      "choices": [
+        {
+          "choice": "jwt",
+          "displayName": "JWT bearer + ASP.NET Identity",
+          "description": "Identity, JWT tokens, roles, user/company administration, account emails, and the matching UI screens."
+        },
+        {
+          "choice": "entra",
+          "displayName": "Microsoft Entra ID (Azure AD) + local roles",
+          "description": "Entra authenticates; roles, profile, and company data stay in the local store, so the user and role administration screens are kept. Drops registration, passwords, and account emails."
+        },
+        {
+          "choice": "none",
+          "displayName": "None",
+          "description": "No authentication. Leaves the layering, middleware, versioning, Swagger, Serilog, and EF Core plumbing."
+        }
+      ]
+    },
+    "includeUi": {
+      "type": "parameter",
+      "datatype": "bool",
+      "defaultValue": "true",
+      "displayName": "Include Vue SPA front end",
+      "description": "Adds src/ui — a Vue 3 + TypeScript + Vite SPA with Pinia, Vue Router, Axios, and a Playwright suite (smoke tests plus a WCAG 2.2 AA accessibility audit) with the GitHub Actions workflow that runs it on every PR, push and release."
+    },
+    "includeTests": {
+      "type": "parameter",
+      "datatype": "bool",
+      "defaultValue": "true",
+      "displayName": "Include test projects",
+      "description": "Adds the xUnit unit-test and integration-test projects."
+    },
+    "includeSamples": {
+      "type": "parameter",
+      "datatype": "bool",
+      "defaultValue": "true",
+      "displayName": "Include sample Product slice",
+      "description": "Adds a worked Product example (entity, DTOs, service, controller, tests) demonstrating the layering. Delete it once you have your own."
+    },
+    "includeDocker": {
+      "type": "parameter",
+      "datatype": "bool",
+      "defaultValue": "false",
+      "displayName": "Include Docker support",
+      "description": "Adds a Dockerfile, docker-compose files, and the Visual Studio docker-compose project for running the API in a container."
+    },
+    "includeInfra": {
+      "type": "parameter",
+      "datatype": "bool",
+      "defaultValue": "false",
+      "displayName": "Include AWS infrastructure and CI",
+      "description": "Adds Terraform for dev and prod (ECR/Fargate API, S3 + CloudFront SPA) and the GitHub Actions workflows that build and deploy them. Implies Docker support."
+    },
+    "useDocker": {
+      "type": "computed",
+      "value": "(includeDocker || includeInfra)"
+    },
+    "projectSlug": {
+      "type": "derived",
+      "valueSource": "name",
+      "valueTransform": "kebabCase",
+      "replaces": "starterapp",
+      "description": "Lower-case, dash-separated form of the project name. Docker image names may not contain upper case, so the sourceName replacement cannot serve here."
+    },
+    "useAuth": {
+      "comment": "Authentication of any kind. Also gates the local user/role/company store, which both authenticated modes share — Entra supplies the identity, the database still owns authorisation.",
+      "type": "computed",
+      "value": "(authMode != \"none\")"
+    },
+    "useLocalIdentity": {
+      "comment": "Passwords: registration, login, reset, change, the JWT the API issues, and the account emails that go with them.",
+      "type": "computed",
+      "value": "(authMode == \"jwt\")"
+    },
+    "useEntra": {
+      "type": "computed",
+      "value": "(authMode == \"entra\")"
+    },
+    "skipRestore": {
+      "type": "parameter",
+      "datatype": "bool",
+      "defaultValue": "false",
+      "description": "If true, skips the automatic restore of the project on create."
+    },
+    "HostIdentifier": {
+      "type": "bind",
+      "binding": "HostIdentifier"
+    }
+  },
+  "guids": [
+    "278998D7-09C0-44CF-A895-72DFFF21902B",
+    "D41225B7-50FD-4062-B307-28920DF29F99",
+    "F7F2C656-284F-4616-8B6F-DA65A26884C5",
+    "27375D09-9D33-42BA-911E-87B2D49FF5DE",
+    "190F9170-356A-4B4F-96DC-717027B85D5B",
+    "DD88AA01-76B9-4DBA-BD96-CE7D78B652F1",
+    "AF8AACFF-52DA-4AB9-B1CD-E483E75D8341",
+    "40601AE4-4880-4D37-A593-01D58937283C",
+    "8504C444-0E7B-48CA-A09F-CD5E9D4F882F",
+    "6C23CDDC-7010-497D-B144-98C3D2D74795",
+    "DC814440-04B4-45BE-8E33-68B817289680",
+    "9CA35890-E65A-4ECF-A507-6E552B9877AA",
+    "70ADC65C-0143-466F-8857-588C1D5ED94A",
+    "44D4EB79-9D14-4578-A168-425A53C31146",
+    "75629971-34A0-44FF-9A88-A0D11EF63602"
+  ],
+  "sources": [
+    {
+      "comment": "Specifying 'exclude' replaces the engine's default list rather than adding to it, so the defaults are restated here. 'node_modules' and 'dist' are the additions: they are not excluded by default, and a maintainer who runs 'pnpm install' inside the template source (which verify.ps1 requires, to type-check the generated UI) would otherwise have every 'dotnet new' copy ~400 packages into the generated project — minutes per generation, and a polluted output tree.",
+      "exclude": [
+        "**/[Bb]in/**",
+        "**/[Oo]bj/**",
+        "**/node_modules/**",
+        "**/dist/**",
+        ".template.config/**/*",
+        "**/*.filelist",
+        "**/*.user",
+        "**/*.lock.json"
+      ],
+      "modifiers": [
+        {
+          "comment": "Two solution files ship, and exactly one survives per host. Visual Studio's template host only recognises the legacy .sln, and it is the .sln that carries the src/api and src/ui solution folders. The CLI gets the .slnx. Emitting both would leave 'dotnet build' with no unambiguous solution to pick.",
+          "condition": "(HostIdentifier == \"dotnetcli\" || HostIdentifier == \"dotnetcli-preview\")",
+          "exclude": [ "StarterApp.sln" ]
+        },
+        {
+          "condition": "(HostIdentifier != \"dotnetcli\" && HostIdentifier != \"dotnetcli-preview\")",
+          "exclude": [ "StarterApp.slnx" ]
+        },
+        {
+          "comment": "The e2e workflow runs the SPA's Playwright + accessibility suite, so it goes wherever the SPA goes — with or without --infra. The UI deploy goes with it: it builds src/ui and calls e2e.yml, so neither has anything to do without the SPA. release.yml survives — it drops its UI job through a conditional.",
+          "condition": "(!includeUi)",
+          "exclude": [
+            "src/ui/**",
+            ".github/workflows/e2e.yml",
+            ".github/workflows/ui_build_and_deploy.yml"
+          ]
+        },
+        {
+          "comment": "Docker support is opt-in. Note the .dcproj is registered in StarterApp.sln only, never StarterApp.slnx: it builds on Microsoft.VisualStudio.Docker.Sdk, which ships with Visual Studio, so a CLI 'dotnet build' of a solution containing it fails outright with an SDK-not-found error.",
+          "condition": "(!useDocker)",
+          "exclude": [
+            "src/api/StarterApp.Api/Dockerfile",
+            "src/api/.dockerignore",
+            "src/api/docker-compose.yml",
+            "src/api/docker-compose.override.yml",
+            "src/api/docker-compose.dcproj"
+          ]
+        },
+        {
+          "comment": "The deploy workflows build the image with docker compose and the Fargate task runs it, so infrastructure without the Docker files would generate a pipeline that cannot build. 'useDocker' is why --infra implies --docker. Listed by file rather than '.github/**' because e2e.yml is gated on --ui, not --infra. release.yml drives the two deploys and Get-NextVersion.ps1 is what all three read the version from, so they go with them.",
+          "condition": "(!includeInfra)",
+          "exclude": [
+            "terraform/**",
+            ".github/workflows/api_build_and_deploy.yml",
+            ".github/workflows/ui_build_and_deploy.yml",
+            ".github/workflows/release.yml",
+            ".github/scripts/**"
+          ]
+        },
+        {
+          "condition": "(!includeTests)",
+          "exclude": [
+            "src/api/StarterApp.UnitTests/**",
+            "src/api/StarterApp.IntegrationTests/**"
+          ]
+        },
+        {
+          "condition": "(!includeSamples)",
+          "exclude": [
+            "src/api/StarterApp.Domain/Entities/Product.cs",
+            "src/api/StarterApp.Application/DTOs/ProductDtos.cs",
+            "src/api/StarterApp.Application/Interfaces/IProductService.cs",
+            "src/api/StarterApp.Application/Services/ProductService.cs",
+            "src/api/StarterApp.Api/Controllers/ProductsController.cs",
+            "src/api/StarterApp.UnitTests/Services/ProductServiceTests.cs"
+          ]
+        },
+        {
+          "condition": "(!useEntra)",
+          "exclude": [
+            "src/api/StarterApp.Infrastructure/Identity/EntraClaimsTransformation.cs",
+            "src/api/StarterApp.IntegrationTests/Fixtures/TestAuthHandler.cs"
+          ]
+        },
+        {
+          "comment": "Entra keeps the local store — users, roles, companies, profile and their screens all survive — and drops only what passwords imply: registration, login, reset, the API-issued JWT, the rate limiter that protected those anonymous endpoints, and the account emails.",
+          "condition": "(useEntra)",
+          "exclude": [
+            "src/api/StarterApp.Api/Controllers/AuthController.cs",
+            "src/api/StarterApp.Api/Extensions/RateLimitingExtensions.cs",
+            "src/api/StarterApp.Api/Extensions/RateLimitSettings.cs",
+            "src/api/StarterApp.Application/DTOs/AuthResponse.cs",
+            "src/api/StarterApp.Application/DTOs/ChangePasswordRequest.cs",
+            "src/api/StarterApp.Application/DTOs/ForgotPasswordRequest.cs",
+            "src/api/StarterApp.Application/DTOs/LoginRequest.cs",
+            "src/api/StarterApp.Application/DTOs/LoginResult.cs",
+            "src/api/StarterApp.Application/DTOs/RegisterRequest.cs",
+            "src/api/StarterApp.Application/DTOs/ResetPasswordRequest.cs",
+            "src/api/StarterApp.Application/Interfaces/ITokenService.cs",
+            "src/api/StarterApp.Application/Interfaces/IUserService.cs",
+            "src/api/StarterApp.Application/Services/AuthService.cs",
+            "src/api/StarterApp.Infrastructure/Identity/JwtSettings.cs",
+            "src/api/StarterApp.Infrastructure/Identity/JwtTokenService.cs",
+            "src/api/StarterApp.UnitTests/Services/AuthServiceTests.cs",
+            "src/api/StarterApp.IntegrationTests/Controllers/AuthControllerTests.cs",
+            "src/api/StarterApp.IntegrationTests/Fixtures/FakeIdentityUser.cs",
+            "src/ui/src/views/Register.vue",
+            "src/ui/src/views/ForgotPassword.vue",
+            "src/ui/src/views/ResetPassword.vue",
+            "src/ui/src/views/ChangePassword.vue",
+            "src/ui/src/components/PasswordRequirements.vue",
+            "src/ui/src/utils/passwordPolicy.ts",
+            "src/ui/e2e/login.spec.ts"
+          ]
+        },
+        {
+          "condition": "(!useAuth)",
+          "exclude": [
+            "src/api/StarterApp.Api/Controllers/AuthController.cs",
+            "src/api/StarterApp.Api/Extensions/RateLimitingExtensions.cs",
+            "src/api/StarterApp.Api/Extensions/RateLimitSettings.cs",
+            "src/api/StarterApp.Api/Controllers/UsersController.cs",
+            "src/api/StarterApp.Api/Controllers/RolesController.cs",
+            "src/api/StarterApp.Api/Controllers/ProfileController.cs",
+            "src/api/StarterApp.Api/Controllers/CompaniesController.cs",
+            "src/api/StarterApp.Api/Controllers/CompanyController.cs",
+            "src/api/StarterApp.Application/DTOs/AuthResponse.cs",
+            "src/api/StarterApp.Application/DTOs/ChangePasswordRequest.cs",
+            "src/api/StarterApp.Application/DTOs/ForgotPasswordRequest.cs",
+            "src/api/StarterApp.Application/DTOs/LoginRequest.cs",
+            "src/api/StarterApp.Application/DTOs/LoginResult.cs",
+            "src/api/StarterApp.Application/DTOs/RegisterRequest.cs",
+            "src/api/StarterApp.Application/DTOs/ResetPasswordRequest.cs",
+            "src/api/StarterApp.Application/DTOs/RoleRequest.cs",
+            "src/api/StarterApp.Application/DTOs/SetCompanyRequest.cs",
+            "src/api/StarterApp.Application/DTOs/UserListItem.cs",
+            "src/api/StarterApp.Application/DTOs/UserProfileResponse.cs",
+            "src/api/StarterApp.Application/DTOs/UserResponse.cs",
+            "src/api/StarterApp.Application/DTOs/CompanyRequest.cs",
+            "src/api/StarterApp.Application/DTOs/CompanyResponse.cs",
+            "src/api/StarterApp.Application/Interfaces/IAccountEmailSender.cs",
+            "src/api/StarterApp.Application/Interfaces/ICompanyAdminService.cs",
+            "src/api/StarterApp.Application/Interfaces/ICompanyService.cs",
+            "src/api/StarterApp.Application/Interfaces/IIdentityService.cs",
+            "src/api/StarterApp.Application/Interfaces/IIdentityUser.cs",
+            "src/api/StarterApp.Application/Interfaces/IRoleManagerService.cs",
+            "src/api/StarterApp.Application/Interfaces/IRoleService.cs",
+            "src/api/StarterApp.Application/Interfaces/ITokenService.cs",
+            "src/api/StarterApp.Application/Interfaces/IUserAdminService.cs",
+            "src/api/StarterApp.Application/Interfaces/IUserProfileService.cs",
+            "src/api/StarterApp.Application/Interfaces/IUserService.cs",
+            "src/api/StarterApp.Application/Services/AuthService.cs",
+            "src/api/StarterApp.Application/Services/CompanyAdminService.cs",
+            "src/api/StarterApp.Application/Services/CompanyService.cs",
+            "src/api/StarterApp.Application/Services/RoleService.cs",
+            "src/api/StarterApp.Application/Services/UserAdminService.cs",
+            "src/api/StarterApp.Application/Services/UserProfileService.cs",
+            "src/api/StarterApp.Domain/Entities/Company.cs",
+            "src/api/StarterApp.Domain/Entities/UserCompany.cs",
+            "src/api/StarterApp.Infrastructure/Identity/**",
+            "src/api/StarterApp.Infrastructure/Data/Contexts/AppIdentityDbContext.cs",
+            "src/api/StarterApp.Infrastructure/Data/Migrations/**",
+            "src/api/StarterApp.Infrastructure/Data/Scripts/**",
+            "src/api/StarterApp.Infrastructure/Services/AccountEmailSender.cs",
+            "src/api/StarterApp.Infrastructure/Templates/**",
+            "src/api/StarterApp.UnitTests/Fakes/**",
+            "src/api/StarterApp.UnitTests/Services/AuthServiceTests.cs",
+            "src/api/StarterApp.UnitTests/Services/CompanyAdminServiceTests.cs",
+            "src/api/StarterApp.UnitTests/Services/CompanyServiceTests.cs",
+            "src/api/StarterApp.UnitTests/Services/RoleServiceTests.cs",
+            "src/api/StarterApp.UnitTests/Services/UserAdminServiceTests.cs",
+            "src/api/StarterApp.UnitTests/Services/UserProfileServiceTests.cs",
+            "src/api/StarterApp.IntegrationTests/Controllers/**",
+            "src/api/StarterApp.IntegrationTests/Fixtures/AuthTokenHelper.cs",
+            "src/api/StarterApp.IntegrationTests/Fixtures/FakeIdentityUser.cs",
+            "src/api/StarterApp.IntegrationTests/Fixtures/UserActivationHelper.cs",
+            "src/ui/src/views/Login.vue",
+            "src/ui/src/views/Register.vue",
+            "src/ui/src/views/ForgotPassword.vue",
+            "src/ui/src/views/ChangePassword.vue",
+            "src/ui/src/views/ResetPassword.vue",
+            "src/ui/src/views/Admin.vue",
+            "src/ui/src/views/admin/**",
+            "src/ui/src/components/PasswordRequirements.vue",
+            "src/ui/src/components/AccountMenu.vue",
+            "src/ui/src/services/auth.ts",
+            "src/ui/src/services/admin.ts",
+            "src/ui/src/store/loginModule.ts",
+            "src/ui/src/store/loginStore.ts",
+            "src/ui/src/utils/passwordPolicy.ts",
+            "src/ui/src/assets/scss/auth-background.scss",
+            "src/ui/e2e/login.spec.ts"
+          ]
+        }
+      ]
+    }
+  ],
+  "primaryOutputs": [
+    { "path": "src/api/StarterApp.Api/StarterApp.Api.csproj" },
+    { "path": "README.md" },
+    { "path": "src/api/StarterApp.Application/StarterApp.Application.csproj" },
+    { "path": "src/api/StarterApp.Domain/StarterApp.Domain.csproj" },
+    { "path": "src/api/StarterApp.Infrastructure/StarterApp.Infrastructure.csproj" },
+    {
+      "condition": "(includeTests)",
+      "path": "src/api/StarterApp.UnitTests/StarterApp.UnitTests.csproj"
+    },
+    {
+      "condition": "(includeTests)",
+      "path": "src/api/StarterApp.IntegrationTests/StarterApp.IntegrationTests.csproj"
+    }
+  ],
+  "postActions": [
+    {
+      "id": "set-startup-project",
+      "condition": "(HostIdentifier == \"vs\")",
+      "description": "Sets the API as the startup project in the solution Visual Studio generates.",
+      "manualInstructions": [],
+      "actionId": "5BECCC32-4D5A-4476-A0F9-BD2E81AF0689",
+      "args": { "projects": "0" }
+    },
+    {
+      "id": "restore",
+      "condition": "(!skipRestore)",
+      "description": "Restore NuGet packages required by this project.",
+      "manualInstructions": [ { "text": "Run 'dotnet restore'" } ],
+      "actionId": "210D431B-A78B-4D2F-B762-4ED3E3EA9025",
+      "continueOnError": true
+    },
+    {
+      "id": "openReadMe",
+      "condition": "(HostIdentifier != \"dotnetcli\" && HostIdentifier != \"dotnetcli-preview\")",
+      "description": "Opens the README so the setup steps are visible.",
+      "manualInstructions": [ { "text": "Open README.md" } ],
+      "actionId": "84C0DA21-51C8-4541-9940-6CA19AF04EE6",
+      "args": { "files": "1" },
+      "continueOnError": true
+    }
+  ]
+}

@@ -1,0 +1,42 @@
+html {
+  font-size: 90%;
+  overflow-y: scroll;
+}
+.content h1 {
+  margin-bottom: 2rem !important;
+}
+
+.content h2 {
+  margin-bottom: 1rem !important;
+}
+
+.button {
+  border-radius: 4px !important;
+  background-color: #0f4d8f !important;
+  border-color: transparent !important;
+}
+
+/* Radio and checkbox groups (vee-radio / vee-checkbox) use bulma-checkradio. */
+.choice .is-checkradio + label {
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
+fieldset.field {
+  border: none;
+  margin-inline: 0;
+  padding: 0;
+}
+.light-button {
+  width: 200px !important;
+  color: #0f4d90 !important;
+  background-color: #fff !important;
+  border-width: 2px !important;
+  border-color: #0f4d90 !important;
+}
+.content a:link:not(.button),
+.content a:link:not(.button):visited {
+  font-weight: 700;
+  text-decoration: underline;
+  color: #0f4d90;
+}

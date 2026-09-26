@@ -1,0 +1,16 @@
+# No 'version:' key — Compose v2 ignores it and warns that it is obsolete.
+
+# Without an explicit name Compose derives the project from the directory, which is
+# 'api' for every project generated from this template — so two of them running at once
+# would fight over the same 'api_default' network and container names.
+name: starterapp
+
+services:
+  starterapp.api:
+    image: ${DOCKER_REGISTRY-}starterapp-api
+    build:
+      context: .
+      dockerfile: StarterApp.Api/Dockerfile
+      args:
+        # Set by the deploy workflow to the release version; a local build is unversioned.
+        APP_VERSION: ${APP_VERSION-0.0.0-local}

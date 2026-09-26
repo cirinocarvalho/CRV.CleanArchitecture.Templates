@@ -1,0 +1,7 @@
+/bin
+/.ui-deps
+/obj
+artifacts
+/.vs
+.DS_Store
+.claude/settings.local.json

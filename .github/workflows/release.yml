@@ -1,0 +1,331 @@
+name: Verify and Release
+
+# Pull requests: verify only.
+# Push to main: verify, then pack the template, tag it, publish a GitHub Release with
+# the .nupkg attached, and push the package to this org's GitHub Packages NuGet feed.
+#
+# Versioning is automatic - see .github/scripts/Get-NextVersion.ps1 and
+# docs/authoring.md#releasing. In short: vMAJOR.MINOR.PATCH tags are the record of what
+# shipped; the bump is read from conventional-commit subjects since the last tag; the
+# csproj <Version> only seeds the very first release.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "content/**"
+      - "CRV.CleanArchitecture.Templates.csproj"
+      - "verify.ps1"
+      - ".github/workflows/release.yml"
+      - ".github/scripts/**"
+  pull_request:
+    branches: [main]
+    paths:
+      - "content/**"
+      - "CRV.CleanArchitecture.Templates.csproj"
+      - "verify.ps1"
+      - ".github/workflows/release.yml"
+      - ".github/scripts/**"
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: Override the bump detected from commit messages
+        type: choice
+        default: auto
+        options: [auto, patch, minor, major]
+
+permissions:
+  contents: read
+
+# One release at a time. Never cancel: a half-finished release job could leave a tag
+# without a package behind it.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  DOTNET_VERSION: 10.0.x
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  # ------------------------------------------------------------------------------
+  version:
+    name: Next version
+    runs-on: ubuntu-latest
+    outputs:
+      release: ${{ steps.next.outputs.release }}
+      version: ${{ steps.next.outputs.version }}
+      tag: ${{ steps.next.outputs.tag }}
+      previous_tag: ${{ steps.next.outputs.previous_tag }}
+      bump: ${{ steps.next.outputs.bump }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # tags and full history are what the version is derived from
+
+      - name: Compute next version
+        id: next
+        shell: pwsh
+        run: ./.github/scripts/Get-NextVersion.ps1 -Bump '${{ github.event.inputs.bump || 'auto' }}'
+
+  # ------------------------------------------------------------------------------
+  verify:
+    name: Verify template
+    # Windows on purpose: verify.ps1 junctions node_modules and shells out to cmd.
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      # The UI type-check needs a prebuilt node_modules (see docs/authoring.md).
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: content/StarterApp/src/ui/pnpm-lock.yaml
+
+      - name: Bootstrap UI dependencies
+        shell: pwsh
+        run: |
+          $ui = 'content\StarterApp\src\ui'
+          New-Item -ItemType Directory -Force .ui-deps | Out-Null
+          Copy-Item "$ui\package.json","$ui\pnpm-lock.yaml","$ui\pnpm-workspace.yaml" .ui-deps
+          Set-Location .ui-deps
+          pnpm install --frozen-lockfile
+
+      # -SkipTests: keeps the job fast; the build and the UI type-check are what prove
+      # the template's conditionals are intact.
+      - name: Generate and build every flag combination
+        shell: pwsh
+        run: ./verify.ps1 -SkipTests -UiNodeModules "$PWD\.ui-deps\node_modules"
+
+  # ------------------------------------------------------------------------------
+  pack:
+    name: Pack
+    needs: [version]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Pack
+        run: >
+          dotnet pack CRV.CleanArchitecture.Templates.csproj
+          --configuration Release
+          --output artifacts
+          -p:Version=${{ needs.version.outputs.version }}
+          -p:RepositoryUrl=${{ github.server_url }}/${{ github.repository }}
+          -p:RepositoryCommit=${{ github.sha }}
+
+      # Prove the package installs and generates before anything is published.
+      - name: Smoke test the package
+        run: |
+          dotnet new install artifacts/*.nupkg
+          dotnet new crv-cleanarch -n Acme.Portal -o "$RUNNER_TEMP/smoke" --no-restore
+          test -f "$RUNNER_TEMP/smoke/Acme.Portal.slnx"
+          dotnet new uninstall CRV.CleanArchitecture.Templates
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: template-package
+          path: artifacts/*.nupkg
+          if-no-files-found: error
+
+  # ------------------------------------------------------------------------------
+  # Generate a project from the packed template and run its own Playwright suite:
+  # the smoke tests plus the WCAG 2.2 AA / ADA accessibility audit. This is the same
+  # suite every generated project runs in its .github/workflows/e2e.yml, so a green
+  # run here proves a fresh project starts accessible. The HTML report per case is
+  # uploaded as an artifact and, on a release, attached to the GitHub Release.
+  e2e:
+    name: E2E + accessibility (${{ matrix.case.name }})
+    needs: [version, pack]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        # One case per authentication mode: each changes which pages exist, and the
+        # accessibility spec scans a different page list under each.
+        case:
+          - { name: jwt, args: "" }
+          - { name: entra, args: "--auth entra" }
+          - { name: no-auth, args: "--auth none" }
+    env:
+      APP_DIR: ${{ github.workspace }}/generated/Acme.Portal
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: template-package
+          path: artifacts
+
+      - name: Generate a project from the package
+        run: |
+          dotnet new install artifacts/*.nupkg
+          dotnet new crv-cleanarch -n Acme.Portal -o "$APP_DIR" --no-restore ${{ matrix.case.args }}
+          test -f "$APP_DIR/src/ui/playwright.config.ts"
+          test -f "$APP_DIR/.github/workflows/e2e.yml"
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      # The generated lockfile is byte-identical to the template's, so the cache can
+      # key on the checked-out copy.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: content/StarterApp/src/ui/pnpm-lock.yaml
+
+      - name: Install UI dependencies
+        working-directory: ${{ env.APP_DIR }}/src/ui
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        working-directory: ${{ env.APP_DIR }}/src/ui
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Run Playwright tests
+        working-directory: ${{ env.APP_DIR }}/src/ui
+        env:
+          CI: true
+        run: pnpm e2e
+
+      - name: Summarise results
+        if: always()
+        working-directory: ${{ env.APP_DIR }}/src/ui
+        env:
+          CASE: ${{ matrix.case.name }}
+        run: |
+          if [ ! -f test-results/results.json ]; then
+            printf '### Playwright + accessibility — %s\n\nNo results file was produced; the run failed before any test executed.\n' "$CASE" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          jq -r --arg case "$CASE" '
+            "### Playwright + accessibility (WCAG 2.2 AA) — \($case)",
+            "",
+            "| Passed | Failed | Flaky | Skipped |",
+            "|---:|---:|---:|---:|",
+            "| \(.stats.expected) | \(.stats.unexpected) | \(.stats.flaky) | \(.stats.skipped) |",
+            "",
+            (if .stats.unexpected > 0 then
+               "**Failed tests**",
+               "",
+               ([.. | objects | select(.ok? == false and .tests? != null) | "- `\(.file)` — \(.title)"] | .[])
+             else
+               "All tests passed."
+             end)
+          ' test-results/results.json >> "$GITHUB_STEP_SUMMARY"
+
+      # Zipped by hand so the release job can attach one file per case as-is.
+      - name: Package report
+        if: always()
+        working-directory: ${{ env.APP_DIR }}/src/ui
+        env:
+          CASE: ${{ matrix.case.name }}
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/reports"
+          [ -d playwright-report ] || { echo "no playwright-report directory"; exit 0; }
+          zip -qr "$GITHUB_WORKSPACE/reports/playwright-report-$CASE.zip" playwright-report test-results
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report-${{ matrix.case.name }}
+          path: reports/*.zip
+          if-no-files-found: warn
+          retention-days: 30
+
+  # ------------------------------------------------------------------------------
+  release:
+    name: Release ${{ needs.version.outputs.tag }}
+    # '!cancelled()' so the explicit result checks below decide, rather than GitHub's
+    # default of skipping the release whenever any need was not a plain success.
+    if: >-
+      !cancelled() &&
+      github.event_name != 'pull_request' &&
+      needs.version.outputs.release == 'true' &&
+      !contains(github.event.head_commit.message, '[skip release]') &&
+      needs.verify.result == 'success' &&
+      needs.pack.result == 'success' &&
+      (needs.e2e.result == 'success' || needs.e2e.result == 'skipped')
+    needs: [version, verify, pack, e2e]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # tag + release
+      packages: write # GitHub Packages NuGet feed
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: template-package
+          path: artifacts
+
+      - name: Download Playwright reports
+        if: needs.e2e.result == 'success'
+        uses: actions/download-artifact@v4
+        with:
+          pattern: playwright-report-*
+          path: reports
+          merge-multiple: true
+
+      - name: Tag
+        env:
+          TAG: ${{ needs.version.outputs.tag }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" -m "Release $TAG"
+          git push origin "$TAG"
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.version.outputs.tag }}
+          PREVIOUS_TAG: ${{ needs.version.outputs.previous_tag }}
+        run: |
+          notes_args=(--generate-notes)
+          if [ -n "$PREVIOUS_TAG" ]; then
+            notes_args+=(--notes-start-tag "$PREVIOUS_TAG")
+          fi
+          assets=(artifacts/*.nupkg)
+          # The reports may be absent if the e2e job was skipped. gh appends the
+          # generated notes after --notes.
+          if compgen -G "reports/*.zip" > /dev/null; then
+            assets+=(reports/*.zip)
+            notes_args+=(--notes "**Playwright e2e + WCAG 2.2 AA accessibility reports** for a project generated from this version are attached as \`playwright-report-<auth mode>.zip\` (unzip and open \`playwright-report/index.html\`).")
+          fi
+          gh release create "$TAG" "${assets[@]}" \
+            --title "$TAG" \
+            "${notes_args[@]}"
+
+      - name: Publish to GitHub Packages
+        run: >
+          dotnet nuget push artifacts/*.nupkg
+          --source "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json"
+          --api-key "${{ github.token }}"
+          --skip-duplicate

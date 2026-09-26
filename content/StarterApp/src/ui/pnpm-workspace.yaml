@@ -1,0 +1,31 @@
+# Dependency build approvals are spelled differently either side of pnpm 11:
+# pnpm 10 reads the 'onlyBuiltDependencies' list, pnpm 11 reads the 'allowBuilds'
+# map. Each version ignores the other's key silently — and the failure is not
+# obvious, because install still "succeeds": esbuild's postinstall never runs, so
+# node_modules/esbuild/bin is missing and the first 'vite build' is what breaks.
+# Both keys are kept in sync deliberately until pnpm 10 is out of use.
+allowBuilds:
+  '@parcel/watcher': true
+  core-js-pure: true
+  esbuild: true
+  vue-demi: true
+
+onlyBuiltDependencies:
+  - '@parcel/watcher'
+  - core-js-pure
+  - esbuild
+  - vue-demi
+
+peerDependencyRules:
+  allowedVersions:
+    # vite-plugin-checker declares eslint >=9 as an (optional) peer for its
+    # ESLint checker. This project only enables its vue-tsc checker
+    # (vite.config.ts), so the ESLint 8 install here is never handed to it.
+    # Drop this rule when ESLint is moved to flat config / v9+.
+    'vite-plugin-checker>eslint': '8'
+
+overrides:
+  # postcss arrives transitively through vue -> @vue/compiler-sfc, which can pin
+  # an unpatched 8.5.x, so force the patched line here.
+  # GHSA-r28c-9q8g-f849 (source-map path traversal), fixed in 8.5.18.
+  postcss: '^8.5.18'

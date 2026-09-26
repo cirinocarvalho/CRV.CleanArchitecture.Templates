@@ -1,0 +1,43 @@
+services:
+  starterapp.api:
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_HTTP_PORTS=8080
+      # Inside the Compose network the database is 'db', not localhost. These override
+      # appsettings.json but not user secrets, which load later in Development.
+      - ConnectionStrings__IdentityConnection=Host=db;Port=5432;Database=starterapp;Username=postgres;Password=postgres
+      - ConnectionStrings__AppConnection=Host=db;Port=5432;Database=starterapp;Username=postgres;Password=postgres
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      # Host port left to Docker so several projects can run at once; read the assigned
+      # port with 'docker compose port starterapp.api 8080'.
+      - "8080"
+    volumes:
+      # User secrets are mounted read-only rather than baked in, so the connection
+      # string and JWT signing key never enter an image layer. The path is under
+      # /home/app because the container runs as the non-root 'app' user.
+      - ${APPDATA}/Microsoft/UserSecrets:/home/app/.microsoft/usersecrets:ro
+
+  # Local development database only — it lives in the override file so the deploy
+  # workflow's 'docker compose build' and production never see it. The data survives
+  # 'docker compose down'; add '-v' to start from an empty database.
+  db:
+    image: postgres:17
+    environment:
+      - POSTGRES_DB=starterapp
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d starterapp"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  db-data:

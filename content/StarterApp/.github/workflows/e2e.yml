@@ -1,0 +1,138 @@
+name: E2E and Accessibility Tests
+
+# Runs the Playwright suite in src/ui/e2e — the smoke tests plus the WCAG 2.2 AA / ADA
+# accessibility audit (axe-core) — against the Vite dev server, and publishes the report.
+#
+# - Pull requests and pushes to main/production: run, then upload the HTML report as a
+#   workflow artifact and write a pass/fail table to the job summary.
+# - Releases: the same, plus the report is attached to the GitHub Release as a .zip.
+# - workflow_call: ui_build_and_deploy.yml runs this first, so a failing suite blocks the
+#   deploy.
+#
+# The shipped tests cover only pages that need no API (login, help center, ...), so no
+# back end is started here. When you add authenticated pages to the suite, start the API
+# in this job first — see src/ui/README.md#end-to-end-and-accessibility-tests.
+
+on:
+  pull_request:
+    paths:
+      - "src/ui/**"
+      - ".github/workflows/e2e.yml"
+  push:
+    branches: [main, production]
+    paths:
+      - "src/ui/**"
+      - ".github/workflows/e2e.yml"
+  release:
+    types: [published]
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+# Superseded PR runs are cancelled; runs on main/production and releases are not, so a
+# deploy that is waiting on this suite (see ui_build_and_deploy.yml) is never cut short.
+concurrency:
+  group: e2e-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  e2e:
+    name: Playwright + axe (WCAG 2.2 AA)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Before setup-node, which needs pnpm present to resolve its cache.
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: src/ui/pnpm-lock.yaml
+
+      - name: Install dependencies
+        working-directory: src/ui
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        working-directory: src/ui
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Run Playwright tests
+        working-directory: src/ui
+        env:
+          CI: true
+        run: pnpm e2e
+
+      # playwright.config.ts writes test-results/results.json in CI; turn it into a
+      # table on the run's Summary tab so nobody has to download the report to see
+      # what failed.
+      - name: Summarise results
+        if: always()
+        working-directory: src/ui
+        run: |
+          if [ ! -f test-results/results.json ]; then
+            echo "### Playwright + accessibility" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "No results file was produced — the run failed before any test executed." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          jq -r '
+            "### Playwright + accessibility (WCAG 2.2 AA)",
+            "",
+            "| Passed | Failed | Flaky | Skipped |",
+            "|---:|---:|---:|---:|",
+            "| \(.stats.expected) | \(.stats.unexpected) | \(.stats.flaky) | \(.stats.skipped) |",
+            "",
+            (if .stats.unexpected > 0 then
+               "**Failed tests**",
+               "",
+               ([.. | objects | select(.ok? == false and .tests? != null) | "- `\(.file)` — \(.title)"] | .[]),
+               "",
+               "Download the `playwright-report` artifact for screenshots, traces and the axe-core findings for each page."
+             else
+               "All tests passed. The `playwright-report` artifact holds the full HTML report, including the axe-core scan attached to every accessibility test."
+             end)
+          ' test-results/results.json >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            src/ui/playwright-report
+            src/ui/test-results
+          if-no-files-found: warn
+          retention-days: 30
+
+  # On a release, attach the report to the release itself so the accessibility evidence
+  # for what shipped lives next to the build. Separate job so the write permission is
+  # scoped to it alone; it never runs when this workflow is called from the deploy.
+  attach-report:
+    name: Attach report to release
+    if: always() && github.event_name == 'release'
+    needs: [e2e]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: playwright-report
+          path: report
+
+      - name: Upload to release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name }}
+          RESULT: ${{ needs.e2e.result }}
+        run: |
+          asset="playwright-report-${TAG}-${RESULT}.zip"
+          (cd report && zip -qr "../$asset" .)
+          gh release upload "$TAG" "$asset" --clobber --repo "$GITHUB_REPOSITORY"

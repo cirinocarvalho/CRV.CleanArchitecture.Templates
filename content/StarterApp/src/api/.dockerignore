@@ -1,0 +1,17 @@
+# Keeps the build context small and stops host build output from overwriting what the
+# image builds. Without this, 'COPY . .' ships every bin/obj folder into the SDK layer.
+**/bin/
+**/obj/
+**/.vs/
+**/.vscode/
+**/node_modules/
+**/*.user
+**/*.suo
+**/docker-compose*.yml
+**/Dockerfile*
+**/.dockerignore
+
+# Developer-local configuration and secrets must never land in an image layer.
+**/appsettings.Development.json
+**/*.pfx
+**/App_Data/

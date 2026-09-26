@@ -1,0 +1,122 @@
+name: Build and Deploy UI
+
+# Pushes to main deploy to the dev environment. Production deploys are driven by
+# release.yml, which calls this workflow with the release version once it has been
+# computed, and tags the repository only after the deploy succeeds.
+#
+# The version is stamped into the bundle as VITE_APP_VERSION, which the help center prints
+# at the foot of every topic so support can ask which build someone is on.
+
+# Automatic deploys are OFF for now: this runs only when started from the Actions tab
+# (or called by release.yml, itself manual-only). To deploy on every push again,
+# uncomment the 'push:' block below.
+on:
+  # push:
+  #   branches: [main]
+  #   paths:
+  #     - "src/ui/**"
+  #     - ".github/workflows/ui_**.yml"
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      version:
+        description: Release version to stamp into the bundle (e.g. 1.4.0). Omitted on a push to main, where a dev pre-release version is derived instead.
+        type: string
+        required: false
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: ui-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # Playwright smoke + WCAG 2.2 AA accessibility suite (see e2e.yml). A failure here
+  # blocks the deploy below, so an inaccessible page never reaches an environment.
+  test:
+    name: Test
+    if: "!contains(github.event.head_commit.message, 'skip ci')"
+    uses: ./.github/workflows/e2e.yml
+    secrets: inherit
+
+  deploy:
+    name: Build and Deploy
+    needs: [test]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Select environment
+        id: env
+        run: |
+          if [ "${{ github.ref }}" = "refs/heads/production" ]; then
+            echo "aws_env=prod" >> "$GITHUB_OUTPUT"
+            echo "mode=prod" >> "$GITHUB_OUTPUT"
+          else
+            echo "aws_env=dev" >> "$GITHUB_OUTPUT"
+            echo "mode=dev" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # the dev version is derived from tags and history
+
+      # A release passes its version in. A push to main derives the version the next
+      # release would carry and marks it as a pre-release of it, e.g. 1.4.0-dev.a1b2c3d.
+      - name: Next version from git history
+        id: next
+        if: inputs.version == ''
+        shell: pwsh
+        run: ./.github/scripts/Get-NextVersion.ps1
+
+      - name: Resolve build version
+        id: version
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+          NEXT_VERSION: ${{ steps.next.outputs.version }}
+        run: |
+          if [ -n "$INPUT_VERSION" ]; then
+            version="$INPUT_VERSION"
+          else
+            version="${NEXT_VERSION}-dev.${GITHUB_SHA::7}"
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Build version: $version"
+
+      # Before setup-node, which needs pnpm present to resolve its cache.
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: src/ui/pnpm-lock.yaml
+
+      - name: Install dependencies
+        working-directory: src/ui
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        working-directory: src/ui
+        env:
+          VITE_APP_VERSION: ${{ steps.version.outputs.version }}
+        run: pnpm build:${{ steps.env.outputs.mode }}
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION || 'us-east-1' }}
+
+      - name: Sync to S3
+        env:
+          AWS_ENV: ${{ steps.env.outputs.aws_env }}
+        run: aws s3 sync src/ui/dist "s3://starterapp-$AWS_ENV-ui" --delete
+
+      # CloudFront caches with the managed CachingOptimized policy, so a sync alone would
+      # keep serving the previous build until the TTL expired.
+      - name: Invalidate CloudFront
+        env:
+          DISTRIBUTION_ID: ${{ steps.env.outputs.aws_env == 'prod' && vars.CF_DISTRIBUTION_ID_PROD || vars.CF_DISTRIBUTION_ID_DEV }}
+        run: aws cloudfront create-invalidation --distribution-id "$DISTRIBUTION_ID" --paths "/*"

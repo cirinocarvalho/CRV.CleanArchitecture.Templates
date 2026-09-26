@@ -1,0 +1,60 @@
+{
+  "$schema": "http://json.schemastore.org/vs-2017.3.host",
+  "icon": "icon.png",
+  "order": 0,
+  "disableHttpsOption": true,
+  "symbolInfo": [
+    {
+      "id": "authMode",
+      "name": {
+        "text": "Authentication"
+      },
+      "isVisible": true,
+      "persistenceScope": "templateGroup"
+    },
+    {
+      "id": "includeUi",
+      "name": {
+        "text": "Include Vue 3 SPA front end (src/ui)"
+      },
+      "isVisible": true,
+      "persistenceScope": "templateGroup"
+    },
+    {
+      "id": "includeTests",
+      "name": {
+        "text": "Include unit and integration test projects"
+      },
+      "isVisible": true,
+      "persistenceScope": "templateGroup"
+    },
+    {
+      "id": "includeSamples",
+      "name": {
+        "text": "Include the sample Product slice"
+      },
+      "isVisible": true,
+      "persistenceScope": "templateGroup"
+    },
+    {
+      "id": "includeDocker",
+      "name": {
+        "text": "Include Docker support (Dockerfile + docker-compose)"
+      },
+      "isVisible": true,
+      "persistenceScope": "templateGroup"
+    },
+    {
+      "id": "includeInfra",
+      "name": {
+        "text": "Include AWS Terraform and GitHub Actions deployment"
+      },
+      "isVisible": true,
+      "persistenceScope": "templateGroup"
+    },
+    {
+      "id": "skipRestore",
+      "isVisible": false
+    }
+  ]
+}

@@ -1,0 +1,123 @@
+name: Build and Deploy API
+
+# Pushes to main deploy to the dev environment. Production deploys are driven by
+# release.yml, which calls this workflow with the release version once it has been
+# computed, and tags the repository only after the deploy succeeds.
+#
+# The version is stamped into the build (-p:Version, so the assembly carries it) and onto
+# the ECR image, which is pushed under two tags: the moving <env>-latest the ECS service
+# pulls, and the immutable version so any release can be found and rolled back to.
+
+# Automatic deploys are OFF for now: this runs only when started from the Actions tab
+# (or called by release.yml, itself manual-only). To deploy on every push again,
+# uncomment the 'push:' block below.
+on:
+  # push:
+  #   branches: [main]
+  #   paths:
+  #     - "src/api/**"
+  #     - ".github/workflows/api_**.yml"
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      version:
+        description: Release version to stamp into the build and tag the image with (e.g. 1.4.0). Omitted on a push to main, where a dev pre-release version is derived instead.
+        type: string
+        required: false
+
+# id-token lets the job exchange a GitHub OIDC token for a short-lived AWS role, so no
+# long-lived AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY secrets are stored in the repo.
+permissions:
+  contents: read
+  id-token: write
+
+# Never let two deploys of the same branch race the same ECS service.
+concurrency:
+  group: api-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Build and Deploy
+    if: "!contains(github.event.head_commit.message, 'skip ci')"
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Select environment
+        id: env
+        run: |
+          if [ "${{ github.ref }}" = "refs/heads/production" ]; then
+            echo "aws_env=prod" >> "$GITHUB_OUTPUT"
+            echo "aspnetcore=Production" >> "$GITHUB_OUTPUT"
+          else
+            echo "aws_env=dev" >> "$GITHUB_OUTPUT"
+            echo "aspnetcore=Test" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # the dev version is derived from tags and history
+
+      # A release passes its version in. A push to main derives the version the next
+      # release would carry and marks it as a pre-release of it, e.g. 1.4.0-dev.a1b2c3d.
+      - name: Next version from git history
+        id: next
+        if: inputs.version == ''
+        shell: pwsh
+        run: ./.github/scripts/Get-NextVersion.ps1
+
+      - name: Resolve build version
+        id: version
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+          NEXT_VERSION: ${{ steps.next.outputs.version }}
+        run: |
+          if [ -n "$INPUT_VERSION" ]; then
+            version="$INPUT_VERSION"
+          else
+            version="${NEXT_VERSION}-dev.${GITHUB_SHA::7}"
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Build version: $version"
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION || 'us-east-1' }}
+
+      - name: Log in to Amazon ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build image
+        working-directory: src/api
+        env:
+          ASPNETCORE_ENVIRONMENT: ${{ steps.env.outputs.aspnetcore }}
+          APP_VERSION: ${{ steps.version.outputs.version }}
+        run: docker compose build
+
+      # Two tags: the moving <env>-latest the ECS service pulls, and the immutable version
+      # so any release can be found and rolled back to. Redeploying a release re-pushes
+      # the version tag, so the ECR repository has to allow mutable tags (the default).
+      - name: Tag and push to ECR
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+          AWS_ENV: ${{ steps.env.outputs.aws_env }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          docker tag starterapp-api:latest "$REGISTRY/starterapp:$AWS_ENV-latest"
+          docker tag starterapp-api:latest "$REGISTRY/starterapp:$VERSION"
+          docker push "$REGISTRY/starterapp:$AWS_ENV-latest"
+          docker push "$REGISTRY/starterapp:$VERSION"
+
+      - name: Deploy to Fargate
+        env:
+          AWS_ENV: ${{ steps.env.outputs.aws_env }}
+        run: |
+          CLUSTER="starterapp-$AWS_ENV-cluster"
+          SERVICE="starterapp-$AWS_ENV-api-service"
+          aws ecs update-service --cluster "$CLUSTER" --service "$SERVICE" --force-new-deployment
+          # Fail the job if the new tasks never reach a steady state, rather than
+          # reporting a green deploy over a crash-looping revision.
+          aws ecs wait services-stable --cluster "$CLUSTER" --service "$SERVICE"

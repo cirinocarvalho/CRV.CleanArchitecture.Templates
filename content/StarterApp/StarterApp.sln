@@ -1,0 +1,140 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.8.0.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{278998D7-09C0-44CF-A895-72DFFF21902B}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "api", "api", "{D41225B7-50FD-4062-B307-28920DF29F99}"
+EndProject
+#if (includeUi)
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "ui", "ui", "{F7F2C656-284F-4616-8B6F-DA65A26884C5}"
+	ProjectSection(SolutionItems) = preProject
+		src\ui\.gitignore = src\ui\.gitignore
+		src\ui\index.html = src\ui\index.html
+		src\ui\package.json = src\ui\package.json
+		src\ui\playwright.config.ts = src\ui\playwright.config.ts
+		src\ui\tsconfig.json = src\ui\tsconfig.json
+		src\ui\vite.config.ts = src\ui\vite.config.ts
+	EndProjectSection
+EndProject
+#endif
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "StarterApp.Api", "src\api\StarterApp.Api\StarterApp.Api.csproj", "{27375D09-9D33-42BA-911E-87B2D49FF5DE}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "StarterApp.Application", "src\api\StarterApp.Application\StarterApp.Application.csproj", "{190F9170-356A-4B4F-96DC-717027B85D5B}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "StarterApp.Domain", "src\api\StarterApp.Domain\StarterApp.Domain.csproj", "{DD88AA01-76B9-4DBA-BD96-CE7D78B652F1}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "StarterApp.Infrastructure", "src\api\StarterApp.Infrastructure\StarterApp.Infrastructure.csproj", "{AF8AACFF-52DA-4AB9-B1CD-E483E75D8341}"
+EndProject
+#if (includeTests)
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "StarterApp.IntegrationTests", "src\api\StarterApp.IntegrationTests\StarterApp.IntegrationTests.csproj", "{40601AE4-4880-4D37-A593-01D58937283C}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "StarterApp.UnitTests", "src\api\StarterApp.UnitTests\StarterApp.UnitTests.csproj", "{8504C444-0E7B-48CA-A09F-CD5E9D4F882F}"
+EndProject
+#endif
+#if (useDocker)
+Project("{E53339B2-1760-4266-BCC7-CA923CBCF16C}") = "docker-compose", "src\api\docker-compose.dcproj", "{DC814440-04B4-45BE-8E33-68B817289680}"
+EndProject
+#endif
+#if (includeUi || includeInfra)
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".github", ".github", "{75629971-34A0-44FF-9A88-A0D11EF63602}"
+	ProjectSection(SolutionItems) = preProject
+#if (includeInfra)
+		.github\workflows\api_build_and_deploy.yml = .github\workflows\api_build_and_deploy.yml
+#endif
+#if (includeUi)
+		.github\workflows\e2e.yml = .github\workflows\e2e.yml
+#endif
+#if (includeInfra)
+		.github\workflows\ui_build_and_deploy.yml = .github\workflows\ui_build_and_deploy.yml
+#endif
+	EndProjectSection
+EndProject
+#endif
+#if (includeInfra)
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "terraform", "terraform", "{9CA35890-E65A-4ECF-A507-6E552B9877AA}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "dev", "dev", "{70ADC65C-0143-466F-8857-588C1D5ED94A}"
+	ProjectSection(SolutionItems) = preProject
+		terraform\dev\api.tf = terraform\dev\api.tf
+		terraform\dev\ui.tf = terraform\dev\ui.tf
+		terraform\dev\variables.tf = terraform\dev\variables.tf
+		terraform\dev\terraform.tfvars.example = terraform\dev\terraform.tfvars.example
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "prod", "prod", "{44D4EB79-9D14-4578-A168-425A53C31146}"
+	ProjectSection(SolutionItems) = preProject
+		terraform\prod\api.tf = terraform\prod\api.tf
+		terraform\prod\ui.tf = terraform\prod\ui.tf
+		terraform\prod\variables.tf = terraform\prod\variables.tf
+		terraform\prod\terraform.tfvars.example = terraform\prod\terraform.tfvars.example
+	EndProjectSection
+EndProject
+#endif
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{27375D09-9D33-42BA-911E-87B2D49FF5DE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{27375D09-9D33-42BA-911E-87B2D49FF5DE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{27375D09-9D33-42BA-911E-87B2D49FF5DE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{27375D09-9D33-42BA-911E-87B2D49FF5DE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{190F9170-356A-4B4F-96DC-717027B85D5B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{190F9170-356A-4B4F-96DC-717027B85D5B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{190F9170-356A-4B4F-96DC-717027B85D5B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{190F9170-356A-4B4F-96DC-717027B85D5B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{DD88AA01-76B9-4DBA-BD96-CE7D78B652F1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DD88AA01-76B9-4DBA-BD96-CE7D78B652F1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DD88AA01-76B9-4DBA-BD96-CE7D78B652F1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DD88AA01-76B9-4DBA-BD96-CE7D78B652F1}.Release|Any CPU.Build.0 = Release|Any CPU
+		{AF8AACFF-52DA-4AB9-B1CD-E483E75D8341}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AF8AACFF-52DA-4AB9-B1CD-E483E75D8341}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AF8AACFF-52DA-4AB9-B1CD-E483E75D8341}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AF8AACFF-52DA-4AB9-B1CD-E483E75D8341}.Release|Any CPU.Build.0 = Release|Any CPU
+#if (includeTests)
+		{40601AE4-4880-4D37-A593-01D58937283C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{40601AE4-4880-4D37-A593-01D58937283C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{40601AE4-4880-4D37-A593-01D58937283C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{40601AE4-4880-4D37-A593-01D58937283C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8504C444-0E7B-48CA-A09F-CD5E9D4F882F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8504C444-0E7B-48CA-A09F-CD5E9D4F882F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8504C444-0E7B-48CA-A09F-CD5E9D4F882F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8504C444-0E7B-48CA-A09F-CD5E9D4F882F}.Release|Any CPU.Build.0 = Release|Any CPU
+#endif
+#if (useDocker)
+		{DC814440-04B4-45BE-8E33-68B817289680}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DC814440-04B4-45BE-8E33-68B817289680}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DC814440-04B4-45BE-8E33-68B817289680}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DC814440-04B4-45BE-8E33-68B817289680}.Release|Any CPU.Build.0 = Release|Any CPU
+#endif
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{D41225B7-50FD-4062-B307-28920DF29F99} = {278998D7-09C0-44CF-A895-72DFFF21902B}
+#if (includeUi)
+		{F7F2C656-284F-4616-8B6F-DA65A26884C5} = {278998D7-09C0-44CF-A895-72DFFF21902B}
+#endif
+		{27375D09-9D33-42BA-911E-87B2D49FF5DE} = {D41225B7-50FD-4062-B307-28920DF29F99}
+		{190F9170-356A-4B4F-96DC-717027B85D5B} = {D41225B7-50FD-4062-B307-28920DF29F99}
+		{DD88AA01-76B9-4DBA-BD96-CE7D78B652F1} = {D41225B7-50FD-4062-B307-28920DF29F99}
+		{AF8AACFF-52DA-4AB9-B1CD-E483E75D8341} = {D41225B7-50FD-4062-B307-28920DF29F99}
+#if (includeTests)
+		{40601AE4-4880-4D37-A593-01D58937283C} = {D41225B7-50FD-4062-B307-28920DF29F99}
+		{8504C444-0E7B-48CA-A09F-CD5E9D4F882F} = {D41225B7-50FD-4062-B307-28920DF29F99}
+#endif
+#if (useDocker)
+		{DC814440-04B4-45BE-8E33-68B817289680} = {D41225B7-50FD-4062-B307-28920DF29F99}
+#endif
+#if (includeInfra)
+		{70ADC65C-0143-466F-8857-588C1D5ED94A} = {9CA35890-E65A-4ECF-A507-6E552B9877AA}
+		{44D4EB79-9D14-4578-A168-425A53C31146} = {9CA35890-E65A-4ECF-A507-6E552B9877AA}
+#endif
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {6C23CDDC-7010-497D-B144-98C3D2D74795}
+	EndGlobalSection
+EndGlobal
