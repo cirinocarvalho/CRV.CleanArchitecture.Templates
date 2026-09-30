@@ -40,13 +40,19 @@ Layer dependency direction: `Api → Application → Domain`, with `Infrastructu
 
 ## Template symbols (defined in `.template.config/template.json`)
 
-| Symbol               | CLI flag           | Type   | Default         | Gates                                                    |
-| -------------------- | ------------------ | ------ | --------------- | -------------------------------------------------------- |
-| `auth`               | `--auth jwt\|none` | choice | `jwt`           | Identity, JWT, roles, admin, account emails, matching UI |
-| `includeUi`          | `--ui`             | bool   | `true`          | `src/ui/**`                                              |
-| `includeTests`       | `--tests`          | bool   | `true`          | UnitTests + IntegrationTests projects                    |
-| `includeSamples`     | `--samples`        | bool   | `true`          | The `Product` worked example slice                       |
-| `useAuth` (computed) | —                  | bool   | `auth == "jwt"` | Same file set as `auth=jwt`                              |
+| Symbol                        | CLI flag                  | Type   | Default / value                   | Gates                                                                       |
+| ----------------------------- | ------------------------- | ------ | --------------------------------- | --------------------------------------------------------------------------- |
+| `authMode`                    | `--auth jwt\|entra\|none` | choice | `jwt`                             | Which auth is scaffolded — drives the three computed auth symbols below     |
+| `includeUi`                   | `--ui`                    | bool   | `true`                            | `src/ui/**` and the UI workflows                                            |
+| `includeTests`                | `--tests`                 | bool   | `true`                            | UnitTests + IntegrationTests projects                                       |
+| `includeSamples`              | `--samples`               | bool   | `true`                            | The `Product` worked example slice                                          |
+| `includeDocker`               | `--docker`                | bool   | `false`                           | Dockerfile, docker-compose files, `.dcproj` (via `useDocker`)               |
+| `includeInfra`                | `--infra`                 | bool   | `false`                           | `terraform/**`, deploy/release workflows, `.github/scripts/**`; implies Docker |
+| `skipRestore`                 | `--no-restore`            | bool   | `false`                           | Skips the post-create restore                                               |
+| `useAuth` (computed)          | —                         | bool   | `authMode != "none"`              | Identity, roles, admin, companies, account emails, login UI                 |
+| `useLocalIdentity` (computed) | —                         | bool   | `authMode == "jwt"`               | Locally issued JWT branches (`#if` only — no exclude block)                 |
+| `useEntra` (computed)         | —                         | bool   | `authMode == "entra"`             | `EntraClaimsTransformation`; excludes the local register/password/token files |
+| `useDocker` (computed)        | —                         | bool   | `includeDocker \|\| includeInfra` | Docker files                                                                |
 
 Every optional file lives under a `condition` + `exclude` block in `sources[0].modifiers` in
 `template.json`. If a file is exclusive to a slice, it MUST be listed there, or `--auth none`
